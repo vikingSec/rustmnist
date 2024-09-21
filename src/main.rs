@@ -48,22 +48,18 @@ struct InputData<'a> {
    num_imgs: i32
 }
 fn softmax(input : Vec<f32>) -> Vec<f32> {
-    let mut output : Vec<f32> = vec![0.0; input.len() ];
+    let mut output: Vec<f32> = Vec::with_capacity(input.len());
+    let max = input.iter().max_by(|a, b| a.total_cmp(b)).unwrap();
     let mut sum = 0.0;
-    let max = input.clone()
-        .into_iter()
-        .max_by(|a,b| a.total_cmp(b)).unwrap();
-    let mut counter = 0;
-    input.into_iter().map(|item| {
-        let res = item.exp() - max;
-        output[counter] = res;
-        sum+=res;
-        counter+=1;
-    });
-    counter = 0;
-    while counter < output.len() {
-        output[counter] = output[counter] / sum; 
-        counter+=1;
+
+    for &item in &input {
+        let res = (item - max).exp();
+        output.push(res);
+        sum += res;
+    }
+
+    for val in &mut output {
+        *val /= sum;
     }
 
     output
@@ -110,7 +106,46 @@ fn read_images() -> Vec<char> {
     ret
 }
 
+/*
+ * void shuffle_data(unsigned char *images, unsigned char *labels, int n) {
+    for (int i = n - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        for (int k = 0; k < INPUT_SIZE; k++) {
+            unsigned char temp = images[i * INPUT_SIZE + k];
+            images[i * INPUT_SIZE + k] = images[j * INPUT_SIZE + k];
+            images[j * INPUT_SIZE + k] = temp;
+        }
+        unsigned char temp = labels[i];
+        labels[i] = labels[j];
+        labels[j] = temp;
+    }
+}
+ * */
+fn shuffle_data(imgs : &Vec<char>, labels : &Vec<char>, n : i32) 
+    -> (Vec<char> , Vec<char>) 
+    {
+    let mut counter = n-1;
+    let top = counter;
+    let mut out_img : Vec<char> = vec!['~'; imgs.len()];
+    let mut out_label : Vec<char> = vec!['~'; labels.len()];
+    let mut rng = rand::thread_rng();
 
+    while counter > 0 {
+
+        let rand : i32 = rng.gen_range(1..top);
+        for k in 0..INPUT_SZ {
+            out_img[(rand * INPUT_SZ + k) as usize] = imgs[(counter * INPUT_SZ + k) as usize];
+            out_img[(counter * INPUT_SZ + k) as usize] = imgs[(rand * INPUT_SZ + k) as usize ];
+
+        }
+        out_label[counter as usize] = labels[rand as usize];
+        out_label[rand as usize] = labels[counter as usize];
+        counter-=1;
+    }
+
+    (out_img, out_label)
+
+}
 
 
 
@@ -123,7 +158,13 @@ fn main() {
         hidden : Layer::new(INPUT_SZ, HIDDEN_SZ),
         output : Layer::new(HIDDEN_SZ, OUTPUT_SZ)
     };
+    let num_imgs = images.len() as i32 / (IMG_SZ * IMG_SZ);
+    let (shuffled_imgs, shuffled_labels) = shuffle_data(&images, &labels, num_imgs);
 
+    let train_size = (TRAIN_SPL * images.len() as f32) as i32;
+    let test_size = images.len() - train_size as usize;
+    
     let duration = start_time.elapsed();
     println!("Setup time: {:?}", duration);
+    // Now we actually train
 }
